@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="utf-8" />
+		<title></title>
+		<style>
+			.box {
+				margin: 20px 20% 20px 30%;
+				display: inline-block;
+				position: relative;
+			}
+			
+			#tab {
+				display: inline-block;
+				background: burlywood;
+			}
+			
+			.die {
+				width: 360px;
+				height: 360px;
+				position: absolute;
+				top: 0;
+				left: 0;
+				background: rgba(255, 255, 255, 0.7);
+				display: none;
+			}
+			
+			#tab table {
+				border-collapse: collapse;
+			}
+			
+			#tab td {
+				width: 10px;
+				height: 10px;
+				border-radius: 50%;
+			}
+			
+			#tab td.food {
+				background: royalblue;
+			}
+			
+			#tab td.snake {
+				background: #6cf;
+			}
+			
+			#dbtn {
+				position: relative;
+			}
+			
+			#btn {
+				background: #999;
+				border: 0;
+				padding: 4px;
+				color: white;
+			}
+			
+			#point {
+				border: 0;
+				position: absolute;
+				top: 0;
+				left: 65px;
+				display: none;
+				text-align: center;
+			}
+		</style>
+	</head>
+	<script src="js/jquery-1.11.0.js" type="text/javascript" charset="utf-8"></script>
+
+	<body>
+		<div class="box">
+			<div id="tab">
+
+			</div>
+			<div class="die">
+				<img src="img/die.jpg"/>
+			</div>
+			<div id="dbtn">
+				<button id="btn">开始游戏</button>
+				<input type="text" name="point" id="point" value="0" />
+			</div>
+		</div>
+
+	</body>
+	<script type="text/javascript">
+		var settings = {
+			pannelSize: 30,
+			speed: 500,
+			workThread: null,
+		};
+
+		function setPannel(size) {
+			var content = [];
+			content.push(`<table>`);
+			for(let i = 0; i < size; i++) {
+				content.push(`<tr>`);
+				for(let j = 0; j < size; j++) {
+					content.push(`<td class="td_${i}_${j}"></td>`);
+				}
+				content.push(`</tr>`);
+			}
+			content.push(`</table>`);
+			$('#tab').html(content.join(''));
+		}
+
+		var Dir = {
+			UP: 38,
+			DOWN: 40,
+			LEFT: 37,
+			RIGHT: 39,
+		};
+
+		function Position(x, y) {
+			this.X = x || 0;
+			this.Y = y || 0;
+		}
+
+		function Food() {
+			this.pos = null;
+			this.Create = function() {
+					if(this.pos) {
+						this.handleDot(false, this.pos, 'food');
+					}
+					let isOk = true;
+					while(isOk) {
+						let x = parseInt(Math.random() * settings.pannelSize),
+							y = parseInt(Math.random() * settings.pannelSize);
+						if(!$('.td_' + x + '_' + y).hasClass('snake')) {
+							isOk = false;
+							let pos = new Position(x, y);
+							this.handleDot(true, pos, 'food');
+							this.pos = pos;
+						}
+					}
+				},
+				this.handleDot = function(flag, dot, className) {
+					if(flag) {
+						$('.td_' + dot.X + '_' + dot.Y).addClass(className);
+					} else {
+						$('.td_' + dot.X + '_' + dot.Y).removeClass(className);
+					}
+				}
+		}
+
+		function Snake(myFood) {
+			this.body = [];
+			this.dir = Dir.DOWN;
+			this.food = myFood;
+			this.Over = function() {
+				clearInterval(settings.workThread);
+				$(".die").css("display", "inline-block");
+				$("#btn").html("再次游戏").show();
+			};
+			this.Create = function() {
+				let isOk = true;
+				while(isOk) {
+					let x = parseInt(Math.random() * (settings.pannelSize - 2)) + 1,
+						y = parseInt(Math.random() * (settings.pannelSize - 2)) + 1;
+					if(!$('.td_' + x + '_' + y).hasClass('food')) {
+						isOk = false;
+						let pos = new Position(x, y);
+						this.handleDot(true, pos, 'snake')
+						this.body.push(pos);
+					}
+				}
+			};
+			this.Move = function() {
+				let oldHead = Object.assign(new Position(), this.body[0]),
+					oldTail = Object.assign(new Position(), this.body[this.body.length - 1]),
+					newHead = Object.assign(new Position(), oldHead);
+				switch(this.dir) {
+					case Dir.UP:
+						newHead.X = newHead.X - 1;
+						break;
+					case Dir.DOWN:
+						newHead.X = newHead.X + 1;
+						break;
+					case Dir.LEFT:
+						newHead.Y = newHead.Y - 1;
+						break;
+					case Dir.RIGHT:
+						newHead.Y = newHead.Y + 1;
+						break;
+					default:
+						break;
+				}
+				this.body.unshift(newHead);
+				this.body.pop();
+				if(this.eatFood()) {
+					this.body.push(oldTail);
+					this.food.Create();
+					this.rePaint(true, newHead, oldTail);
+				} else if(this.konckWall() || this.konckBody()) {
+					this.Over();
+				} else {
+					this.rePaint(false, newHead, oldTail);
+				}
+			};
+			this.eatFood = function() {
+				let newHead = this.body[0];
+				if(newHead.X == this.food.pos.X && newHead.Y == this.food.pos.Y) {
+					$("#point").css("display", "inline-block");
+					var po = Number($("#point").val());
+					po += 10;
+					$("#point").val(po);
+					return true;
+				} else {
+					return false;
+				}
+			};
+			this.konckWall = function() {
+				let newHead = this.body[0];
+				if(newHead.X == -1 || newHead.Y == -1 || newHead.X == settings.pannelSize || newHead.Y == settings.pannelSize) {
+					return true;
+				} else {
+					return false;
+				}
+			};
+			this.konckBody = function() {
+				let newHead = this.body[0],
+					flag = false;
+				this.body.map(function(elem, index) {
+					if(index == 0)
+						return;
+					if(elem.X == newHead.X && elem.Y == newHead.Y) {
+						flag = true;
+					}
+				});
+				return flag;
+			};
+			this.rePaint = function(isEatFood, newHead, oldTail) {
+				if(isEatFood) {
+					this.handleDot(true, newHead, 'snake');
+				} else {
+					this.handleDot(true, newHead, 'snake');
+					this.handleDot(false, oldTail, 'snake');
+				}
+			};
+			this.handleDot = function(flag, dot, className) {
+				if(flag) {
+					$('.td_' + dot.X + '_' + dot.Y).addClass(className);
+				} else {
+					$('.td_' + dot.X + '_' + dot.Y).removeClass(className);
+				}
+			};
+		}
+
+		function Control() {
+			this.snake = null;
+			this.bindClick = function() {
+				var that = this;
+				$(document).on('keydown', function(e) {
+					if(!that.snake)
+						return;
+					var canChangrDir = true;
+					switch(e.keyCode) {
+						case Dir.DOWN:
+							if(that.snake.dir == Dir.UP) {
+								canChangrDir = false;
+							}
+							break;
+						case Dir.UP:
+							if(that.snake.dir == Dir.DOWN) {
+								canChangrDir = false;
+							}
+							break;
+						case Dir.LEFT:
+							if(that.snake.dir == Dir.RIGHT) {
+								canChangrDir = false;
+							}
+							break;
+						case Dir.RIGHT:
+							if(that.snake.dir == Dir.LEFT) {
+								canChangrDir = false;
+							}
+							break;
+						default:
+							canChangrDir = false;
+							break;
+					}
+					if(canChangrDir) {
+						that.snake.dir = e.keyCode;
+					}
+				});
+				$("#btn").click(function() {
+					$('.food').removeClass('food');
+					$('.snake').removeClass('snake');
+					$(".die").css("display", "none");
+					that.startGame();
+					$("#point").val(0);
+					$("#btn").hide();
+				})
+			};
+			this.init = function() {
+				this.bindClick();
+				setPannel(settings.pannelSize);
+			};
+			this.startGame = function() {
+				var food = new Food();
+				food.Create();
+				var snake = new Snake(food);
+				snake.Create();
+				this.snake = snake;
+				settings.workThread = setInterval(function() {
+					snake.Move();
+				}, settings.speed);
+			}
+			this.init();
+		}
+		new Control();
+	</script>
+
+</html>
